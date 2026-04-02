@@ -5,6 +5,9 @@ on:
     - cron: '*/15 * * * *'  # every 15 minutes
   workflow_dispatch:        # allows manual trigger from the Actions tab
 
+permissions:
+  contents: write
+
 jobs:
   update:
     runs-on: ubuntu-latest
