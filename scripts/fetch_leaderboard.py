@@ -28,10 +28,8 @@ def steam_get(base, interface, method, version, params):
 _leaderboard_cache = {}
 
 def find_leaderboard(name):
-    """Look up a leaderboard ID by name using GetLeaderboardsForGame."""
     global _leaderboard_cache
 
-    # Fetch once and cache for both calls
     if not _leaderboard_cache:
         data = steam_get(
             PARTNER_API,
@@ -40,9 +38,10 @@ def find_leaderboard(name):
             "v1",
             {"appid": APP_ID}
         )
-        print(f"[DEBUG] Raw response: {json.dumps(data, indent=2)}")
-        leaderboards = data.get("result", {}).get("leaderboards", [])
-        _leaderboard_cache = {lb["name"]: lb["leaderboardID"] for lb in leaderboards}
+        boards = data.get("leaderBoards", {})
+        for key, val in boards.items():
+            if isinstance(val, dict) and "leaderBoardID" in val:
+                _leaderboard_cache[key] = val["leaderBoardID"]
         print(f"[INFO] Found {len(_leaderboard_cache)} leaderboards: {list(_leaderboard_cache.keys())}")
 
     lb_id = _leaderboard_cache.get(name)
@@ -52,6 +51,7 @@ def find_leaderboard(name):
 
     print(f"[INFO] Resolved '{name}' → leaderboard ID {lb_id}")
     return lb_id
+
 
 
 def get_entries(leaderboard_id, data_request=3, start=1, end=100):
