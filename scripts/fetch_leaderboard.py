@@ -25,23 +25,33 @@ def steam_get(base, interface, method, version, params):
     with urllib.request.urlopen(url, timeout=15) as r:
         return json.loads(r.read().decode())
 
+_leaderboard_cache = {}
+
 def find_leaderboard(name):
-    """Resolve a leaderboard name string to its numeric ID."""
-    data = steam_get(
-        PUBLIC_API,
-        "ISteamLeaderboards",
-        "FindLeaderboard",
-        "v1",
-        {"appid": APP_ID, "leaderboardName": name}
-    )
-    result = data.get("result", {})
-    lb_id = result.get("leaderboardID")
+    """Look up a leaderboard ID by name using GetLeaderboardsForGame."""
+    global _leaderboard_cache
+
+    # Fetch once and cache for both calls
+    if not _leaderboard_cache:
+        data = steam_get(
+            PARTNER_API,
+            "ISteamLeaderboards",
+            "GetLeaderboardsForGame",
+            "v1",
+            {"appid": APP_ID}
+        )
+        leaderboards = data.get("result", {}).get("leaderboards", [])
+        _leaderboard_cache = {lb["name"]: lb["leaderboardID"] for lb in leaderboards}
+        print(f"[INFO] Found {len(_leaderboard_cache)} leaderboards: {list(_leaderboard_cache.keys())}")
+
+    lb_id = _leaderboard_cache.get(name)
     if not lb_id:
-        print(f"[ERROR] Could not find leaderboard: '{name}'")
-        print(f"        Full response: {json.dumps(data, indent=2)}")
+        print(f"[ERROR] Leaderboard '{name}' not found. Available: {list(_leaderboard_cache.keys())}")
         sys.exit(1)
+
     print(f"[INFO] Resolved '{name}' → leaderboard ID {lb_id}")
     return lb_id
+
 
 def get_entries(leaderboard_id, data_request=3, start=1, end=100):
     """Fetch leaderboard entries. data_request=3 = global, start/end = rank range."""
