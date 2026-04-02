@@ -69,7 +69,7 @@ def get_entries(leaderboard_id, data_request=3, start=1, end=100):
         }
     )
     print(f"[DEBUG] GetLeaderboardEntries response: {json.dumps(data, indent=2)}")
-    return data.get("leaderboardEntryInformation", {}).get("entries", [])
+    return data.get("leaderboardEntryInformation", {}).get("leaderboardEntries", [])
 
 def resolve_names(steam_ids):
     """Batch-resolve Steam IDs to persona names."""
@@ -107,7 +107,7 @@ def build_entry_list(entries, names):
         sid   = int(e.get("steamID", 0))
         score = e.get("score", 0)
         result.append({
-            "rank":     e.get("globalRank", 0),
+            "rank":     e.get("rank", 0),
             "name":     names.get(sid, str(sid)),
             "score":    score,
             "duration": format_time(score),
@@ -122,9 +122,6 @@ def main():
     # Fetch entries
     dead_entries  = get_entries(dead_id,  start=1, end=100)
     alive_entries = get_entries(alive_id, start=1, end=100)
-
-    # Filter currently alive: score == 0 means still running
-    alive_entries = [e for e in alive_entries if e.get("score", -1) == 0]
 
     # Resolve all Steam IDs to names in two batch calls
     dead_ids  = [int(e["steamID"]) for e in dead_entries  if "steamID" in e]
