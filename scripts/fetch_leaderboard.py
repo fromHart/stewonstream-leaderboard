@@ -28,7 +28,7 @@ def steam_get(base, interface, method, version, params):
 def find_leaderboard(name):
     """Resolve a leaderboard name string to its numeric ID."""
     data = steam_get(
-        PARTNER_API,
+        PUBLIC_API,
         "ISteamLeaderboards",
         "FindLeaderboard",
         "v1",
@@ -38,7 +38,7 @@ def find_leaderboard(name):
     lb_id = result.get("leaderboardID")
     if not lb_id:
         print(f"[ERROR] Could not find leaderboard: '{name}'")
-        print(f"        Response: {data}")
+        print(f"        Full response: {json.dumps(data, indent=2)}")
         sys.exit(1)
     print(f"[INFO] Resolved '{name}' → leaderboard ID {lb_id}")
     return lb_id
