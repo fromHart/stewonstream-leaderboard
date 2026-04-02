@@ -55,7 +55,6 @@ def find_leaderboard(name):
 
 
 def get_entries(leaderboard_id, data_request=3, start=1, end=100):
-    """Fetch leaderboard entries. data_request=3 = global, start/end = rank range."""
     data = steam_get(
         PARTNER_API,
         "ISteamLeaderboards",
@@ -69,6 +68,7 @@ def get_entries(leaderboard_id, data_request=3, start=1, end=100):
             "rangeEnd":      end,
         }
     )
+    print(f"[DEBUG] GetLeaderboardEntries response: {json.dumps(data, indent=2)}")
     return data.get("leaderboardEntryInformation", {}).get("entries", [])
 
 def resolve_names(steam_ids):
