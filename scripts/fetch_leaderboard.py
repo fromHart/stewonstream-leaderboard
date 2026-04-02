@@ -40,6 +40,7 @@ def find_leaderboard(name):
             "v1",
             {"appid": APP_ID}
         )
+        print(f"[DEBUG] Raw response: {json.dumps(data, indent=2)}")
         leaderboards = data.get("result", {}).get("leaderboards", [])
         _leaderboard_cache = {lb["name"]: lb["leaderboardID"] for lb in leaderboards}
         print(f"[INFO] Found {len(_leaderboard_cache)} leaderboards: {list(_leaderboard_cache.keys())}")
