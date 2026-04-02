@@ -86,13 +86,12 @@ def resolve_names(steam_ids):
     players = data.get("response", {}).get("players", [])
     return {int(p["steamid"]): p["personaname"] for p in players}
 
-def format_time(total_seconds):
-    """Mirror StewTime.Format() from C#."""
-    s = int(total_seconds)
-    years   = s // (365 * 24 * 3600); s %= (365 * 24 * 3600)
-    days    = s // (24 * 3600);       s %= (24 * 3600)
-    hours   = s // 3600;              s %= 3600
-    minutes = s // 60
+def format_time(total_minutes):
+    m = int(total_minutes)
+    years   = m // (365 * 24 * 60); m %= (365 * 24 * 60)
+    days    = m // (24 * 60);       m %= (24 * 60)
+    hours   = m // 60;              m %= 60
+    minutes = m
 
     if years  > 0: return f"{years}y {days}d"
     if days   > 0: return f"{days}d {hours}h"
