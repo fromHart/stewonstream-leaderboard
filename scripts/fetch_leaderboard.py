@@ -7,7 +7,7 @@ import urllib.parse
 
 # ── Config ────────────────────────────────────────────────────────────────────
 STEAM_API_KEY      = os.environ["STEAM_API_KEY"]
-APP_ID             = os.environ["APP_ID"]
+APP_ID             = os.environ["STEAM_APP_ID"]
 
 LEADERBOARD_NAME_DEAD  = "Stew_Dead"
 LEADERBOARD_NAME_ALIVE = "Stew_Alive"
