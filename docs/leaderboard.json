@@ -1,5 +1,19 @@
 {
-  "updated": "2026-04-02T02:45:22.264644+00:00",
-  "allTime": [],
-  "currentlyAlive": []
+  "updated": "2026-04-02T02:56:52.528934+00:00",
+  "allTime": [
+    {
+      "rank": 1,
+      "name": "Mell0wD",
+      "score": 0,
+      "duration": "0m"
+    }
+  ],
+  "currentlyAlive": [
+    {
+      "rank": 1,
+      "name": "Mell0wD",
+      "score": 36,
+      "duration": "0m"
+    }
+  ]
 }
