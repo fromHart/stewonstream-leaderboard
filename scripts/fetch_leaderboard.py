@@ -9,7 +9,7 @@ import urllib.parse
 STEAM_API_KEY      = os.environ["STEAM_API_KEY"]
 APP_ID             = os.environ["STEAM_APP_ID"]
 
-LEADERBOARD_NAME_DEAD  = "Stew_Dead"
+LEADERBOARD_NAME_ALLTIME  = "Stew_AllTime"
 LEADERBOARD_NAME_ALIVE = "Stew_Alive"
 
 OUTPUT_PATH = "docs/leaderboard.json"
@@ -68,7 +68,6 @@ def get_entries(leaderboard_id, data_request=3, start=1, end=100):
             "rangeEnd":      end,
         }
     )
-    print(f"[DEBUG] GetLeaderboardEntries response: {json.dumps(data, indent=2)}")
     return data.get("leaderboardEntryInformation", {}).get("leaderboardEntries", [])
 
 def resolve_names(steam_ids):
@@ -115,22 +114,22 @@ def build_entry_list(entries, names):
 
 def main():
     # Resolve leaderboard names → numeric IDs
-    dead_id  = find_leaderboard(LEADERBOARD_NAME_DEAD)
+    allTime_id  = find_leaderboard(LEADERBOARD_NAME_ALLTIME)
     alive_id = find_leaderboard(LEADERBOARD_NAME_ALIVE)
 
     # Fetch entries
-    dead_entries  = get_entries(dead_id,  start=1, end=100)
+    allTime_entries  = get_entries(allTime_id,  start=1, end=100)
     alive_entries = get_entries(alive_id, start=1, end=100)
 
     # Resolve all Steam IDs to names in two batch calls
-    dead_ids  = [int(e["steamID"]) for e in dead_entries  if "steamID" in e]
+    allTime_ids  = [int(e["steamID"]) for e in allTime_entries  if "steamID" in e]
     alive_ids = [int(e["steamID"]) for e in alive_entries if "steamID" in e]
-    all_ids   = list(set(dead_ids + alive_ids))
+    all_ids   = list(set(allTime_ids + alive_ids))
     names     = resolve_names(all_ids)
 
     output = {
         "updated":        datetime.now(timezone.utc).isoformat(),
-        "allTime":        build_entry_list(dead_entries,  names),
+        "allTime":        build_entry_list(allTime_entries,  names),
         "currentlyAlive": build_entry_list(alive_entries, names),
     }
 
