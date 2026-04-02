@@ -1,83 +1,138 @@
-import os, json, requests
+import json
+import os
+import sys
 from datetime import datetime, timezone
+import urllib.request
+import urllib.parse
 
-def format_time(total_minutes):
-    """Mirror StewTime.Format — years/days/hours/minutes, omitting zeroes."""
-    years    = total_minutes // 525960
-    rem      = total_minutes  % 525960
-    days     = rem // 1440;  rem = rem % 1440
-    hours    = rem // 60;    minutes = rem % 60
-    parts = []
-    if years:             parts.append(f"{years}y")
-    if days:              parts.append(f"{days}d")
-    if hours:             parts.append(f"{hours}h")
-    if minutes or not parts: parts.append(f"{minutes}m")
-    return " ".join(parts)
+# ── Config ────────────────────────────────────────────────────────────────────
+STEAM_API_KEY      = os.environ["STEAM_API_KEY"]
+APP_ID             = os.environ["APP_ID"]
 
-def fetch_entries(api_key, app_id, leaderboard_id, count=100):
-    r = requests.get(
-        "https://partner.steam-api.com/ISteamLeaderboards/GetLeaderboardEntries/v1/",
-        params={
-            "key":          api_key,
-            "appid":        app_id,
-            "leaderboardid": leaderboard_id,
-            "rangestart":   0,
-            "rangeend":     count - 1,
-            "datarequest":  1,  # global ranking
-        },
-        timeout=10,
+LEADERBOARD_NAME_DEAD  = "Stew_Dead"
+LEADERBOARD_NAME_ALIVE = "Stew_Alive"
+
+OUTPUT_PATH = "docs/leaderboard.json"
+
+PARTNER_API = "https://partner.steam-api.com"
+PUBLIC_API  = "https://api.steampowered.com"
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def steam_get(base, interface, method, version, params):
+    params["key"] = STEAM_API_KEY
+    url = f"{base}/{interface}/{method}/{version}/?{urllib.parse.urlencode(params)}"
+    with urllib.request.urlopen(url, timeout=15) as r:
+        return json.loads(r.read().decode())
+
+def find_leaderboard(name):
+    """Resolve a leaderboard name string to its numeric ID."""
+    data = steam_get(
+        PARTNER_API,
+        "ISteamLeaderboards",
+        "FindLeaderboard",
+        "v1",
+        {"appid": APP_ID, "leaderboardName": name}
     )
-    r.raise_for_status()
-    raw = r.json().get("leaderboard", {}).get("entries", {}).get("entry", [])
-    # Steam returns a dict (not list) when there's only one entry
-    return raw if isinstance(raw, list) else [raw]
+    result = data.get("result", {})
+    lb_id = result.get("leaderboardID")
+    if not lb_id:
+        print(f"[ERROR] Could not find leaderboard: '{name}'")
+        print(f"        Response: {data}")
+        sys.exit(1)
+    print(f"[INFO] Resolved '{name}' → leaderboard ID {lb_id}")
+    return lb_id
 
-def fetch_names(api_key, steam_ids):
-    """Resolve Steam IDs to persona names in one batch call (max 100)."""
+def get_entries(leaderboard_id, data_request=3, start=1, end=100):
+    """Fetch leaderboard entries. data_request=3 = global, start/end = rank range."""
+    data = steam_get(
+        PARTNER_API,
+        "ISteamLeaderboards",
+        "GetLeaderboardEntries",
+        "v1",
+        {
+            "appid":         APP_ID,
+            "leaderboardid": leaderboard_id,
+            "dataRequest":   data_request,
+            "rangeStart":    start,
+            "rangeEnd":      end,
+        }
+    )
+    return data.get("leaderboardEntryInformation", {}).get("entries", [])
+
+def resolve_names(steam_ids):
+    """Batch-resolve Steam IDs to persona names."""
     if not steam_ids:
         return {}
-    r = requests.get(
-        "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/",
-        params={"key": api_key, "steamids": ",".join(steam_ids)},
-        timeout=10,
+    ids_str = ",".join(str(sid) for sid in steam_ids)
+    data = steam_get(
+        PUBLIC_API,
+        "ISteamUser",
+        "GetPlayerSummaries",
+        "v2",
+        {"steamids": ids_str}
     )
-    r.raise_for_status()
-    players = r.json().get("response", {}).get("players", [])
-    return {p["steamid"]: p["personaname"] for p in players}
+    players = data.get("response", {}).get("players", [])
+    return {int(p["steamid"]): p["personaname"] for p in players}
 
-api_key    = os.environ["STEAM_API_KEY"]
-app_id     = os.environ["STEAM_APP_ID"]
-dead_id    = os.environ["LEADERBOARD_ID_DEAD"]
-alive_id   = os.environ["LEADERBOARD_ID_ALIVE"]
+def format_time(total_seconds):
+    """Mirror StewTime.Format() from C#."""
+    s = int(total_seconds)
+    years   = s // (365 * 24 * 3600); s %= (365 * 24 * 3600)
+    days    = s // (24 * 3600);       s %= (24 * 3600)
+    hours   = s // 3600;              s %= 3600
+    minutes = s // 60
 
-output = {
-    "updated":       datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-    "allTime":       [],
-    "currentlyAlive": [],
-}
+    if years  > 0: return f"{years}y {days}d"
+    if days   > 0: return f"{days}d {hours}h"
+    if hours  > 0: return f"{hours}h {minutes}m"
+    return f"{minutes}m"
 
-def process(leaderboard_id, key, filter_zero=False):
-    try:
-        entries = fetch_entries(api_key, app_id, leaderboard_id)
-        if filter_zero:
-            entries = [e for e in entries if int(e.get("score", 0)) > 0]
-        ids = [e["steamid"] for e in entries]
-        names = fetch_names(api_key, ids)
-        for e in entries:
-            sid = e["steamid"]
-            output[key].append({
-                "rank":    int(e["rank"]),
-                "name":    names.get(sid, sid),
-                "score":   int(e["score"]),
-                "display": format_time(int(e["score"])),
-            })
-        print(f"{key}: {len(output[key])} entries")
-    except Exception as ex:
-        print(f"Error fetching {key}: {ex}")
+# ── Main ──────────────────────────────────────────────────────────────────────
 
-process(dead_id,  "allTime")
-process(alive_id, "currentlyAlive", filter_zero=True)
+def build_entry_list(entries, names):
+    result = []
+    for e in entries:
+        sid   = int(e.get("steamID", 0))
+        score = e.get("score", 0)
+        result.append({
+            "rank":     e.get("globalRank", 0),
+            "name":     names.get(sid, str(sid)),
+            "score":    score,
+            "duration": format_time(score),
+        })
+    return result
 
-os.makedirs("docs", exist_ok=True)
-with open("docs/leaderboard.json", "w") as f:
-    json.dump(output, f, indent=2)
+def main():
+    # Resolve leaderboard names → numeric IDs
+    dead_id  = find_leaderboard(LEADERBOARD_NAME_DEAD)
+    alive_id = find_leaderboard(LEADERBOARD_NAME_ALIVE)
+
+    # Fetch entries
+    dead_entries  = get_entries(dead_id,  start=1, end=100)
+    alive_entries = get_entries(alive_id, start=1, end=100)
+
+    # Filter currently alive: score == 0 means still running
+    alive_entries = [e for e in alive_entries if e.get("score", -1) == 0]
+
+    # Resolve all Steam IDs to names in two batch calls
+    dead_ids  = [int(e["steamID"]) for e in dead_entries  if "steamID" in e]
+    alive_ids = [int(e["steamID"]) for e in alive_entries if "steamID" in e]
+    all_ids   = list(set(dead_ids + alive_ids))
+    names     = resolve_names(all_ids)
+
+    output = {
+        "updated":        datetime.now(timezone.utc).isoformat(),
+        "allTime":        build_entry_list(dead_entries,  names),
+        "currentlyAlive": build_entry_list(alive_entries, names),
+    }
+
+    os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
+    with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
+        json.dump(output, f, indent=2, ensure_ascii=False)
+
+    print(f"[OK] Wrote {len(output['allTime'])} all-time and "
+          f"{len(output['currentlyAlive'])} alive entries → {OUTPUT_PATH}")
+
+if __name__ == "__main__":
+    main()
